@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Confirm Payment</title>
+    <link rel="stylesheet" href="confirm.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="top">Veyrun</header>
+      <main class="card">
+        <p class="eyebrow">Total amount</p>
+        <div class="amount" id="amount">$0.00</div>
+        <p class="subtitle" id="headline">I can pay this for you.</p>
+        <div class="divider"></div>
+        <div class="row">
+          <span class="label">Recipient</span>
+          <span id="recipient-short" class="mono">-</span>
+        </div>
+        <div class="row">
+          <span class="label">Description</span>
+          <p class="desc" id="description">-</p>
+        </div>
+      </main>
+      <div class="footer">
+        <button id="confirm" class="primary">Confirm</button>
+      </div>
+    </div>
+    <script type="module" src="confirm.js"></script>
+  </body>
+</html>

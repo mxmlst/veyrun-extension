@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { verifyPayment } from "../../../../../lib/verifyPayment";
+import { verifyPayment } from "../../../../lib/verifyPayment";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const txHash = typeof body.txHash === "string" ? body.txHash : null;
   const recipient = typeof body.recipient === "string" ? body.recipient : null;
   const amount = typeof body.amount === "string" ? body.amount : null;
+  const resource = typeof body.resource === "string" ? body.resource : undefined;
 
   if (!txHash || !recipient || !amount) {
     return NextResponse.json(
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const receipt = await verifyPayment({ txHash, recipient, amount });
+    const receipt = await verifyPayment({ txHash, recipient, amount, resource });
     return NextResponse.json({ ok: true, receipt });
   } catch (error) {
     return NextResponse.json(

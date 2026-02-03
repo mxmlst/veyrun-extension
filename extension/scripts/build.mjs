@@ -17,7 +17,9 @@ const buildOptions = {
   entryPoints: {
     background: path.resolve(root, "src", "background.ts"),
     content: path.resolve(root, "src", "content.ts"),
-    popup: path.resolve(root, "src", "popup.ts")
+    popup: path.resolve(root, "src", "popup.ts"),
+    debug: path.resolve(root, "src", "debug.ts"),
+    confirm: path.resolve(root, "src", "confirm.ts")
   },
   outdir: dist,
   bundle: true,
@@ -34,5 +36,10 @@ if (isWatch) {
 }
 
 await cp(path.resolve(root, "public", "manifest.json"), path.resolve(dist, "manifest.json"));
+await cp(path.resolve(root, "public", "icon.png"), path.resolve(dist, "icon.png"));
 await cp(path.resolve(root, "src", "popup.html"), path.resolve(dist, "popup.html"));
 await cp(path.resolve(root, "src", "popup.css"), path.resolve(dist, "popup.css"));
+await cp(path.resolve(root, "src", "confirm.html"), path.resolve(dist, "confirm.html"));
+await cp(path.resolve(root, "src", "confirm.css"), path.resolve(dist, "confirm.css"));
+await cp(path.resolve(root, "src", "debug.html"), path.resolve(dist, "debug.html"));
+await cp(path.resolve(root, "src", "debug.css"), path.resolve(dist, "debug.css"));

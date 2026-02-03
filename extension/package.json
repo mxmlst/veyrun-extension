@@ -8,7 +8,10 @@
     "build": "node scripts/build.mjs"
   },
   "dependencies": {
-    "@veyrun/shared": "workspace:*"
+    "@veyrun/shared": "workspace:*",
+    "@x402/evm": "^2.2.0",
+    "@x402/fetch": "^2.2.0",
+    "viem": "^2.21.4"
   },
   "devDependencies": {
     "esbuild": "^0.21.5",

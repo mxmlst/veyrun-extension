@@ -7,10 +7,93 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <div id="root">
-      <h1>Veyrun</h1>
-      <p id="status">Loading...</p>
+    <main class="app">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Veyrun</p>
+          <h1>Unlock x402</h1>
+        </div>
+        <span class="pill" id="status-pill">Idle</span>
+      </header>
+
+      <section class="card" id="event-card">
+        <div class="card-title">Latest 402</div>
+        <div class="row">
+          <span class="label">Site</span>
+          <span class="value" id="event-domain">-</span>
+        </div>
+        <div class="row">
+          <span class="label">Amount</span>
+          <span class="value" id="event-amount">-</span>
+        </div>
+        <div class="row">
+          <span class="label">Recipient</span>
+          <span class="value mono" id="event-recipient">-</span>
+        </div>
+        <div class="row">
+          <span class="label">Time</span>
+          <span class="value" id="event-time">-</span>
+        </div>
+        <div class="row hidden" id="pending-row">
+          <span class="label">Pending</span>
+          <span class="value" id="pending-value">Awaiting confirmation</span>
+        </div>
+        <button class="primary" id="pay-button" disabled>Pay with Veyrun</button>
+      </section>
+
+      <section class="card" id="wallet-card">
+        <div class="card-title">Agent Wallet</div>
+        <div class="row">
+          <span class="label">Address</span>
+          <span class="value mono" id="wallet-address">Not set</span>
+        </div>
+        <div class="row">
+          <span class="label">Balance</span>
+          <span class="value" id="wallet-balance">-</span>
+        </div>
+        <div class="row">
+          <span class="label">Network</span>
+          <span class="value" id="wallet-chain">-</span>
+        </div>
+        <div class="button-row">
+          <button class="secondary" id="copy-address">Copy</button>
+          <button class="secondary" id="refresh-balance">Refresh</button>
+          <button class="secondary" id="topup">Top up</button>
+        </div>
+        <div class="button-row">
+          <button class="ghost" id="create-agent">Create new agent</button>
+          <button class="ghost" id="change-account">Change account</button>
+        </div>
+      </section>
+    </main>
+
+    <div id="modal" class="modal hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>Change account</h2>
+          <button id="close-modal" class="icon">?</button>
+        </div>
+        <label class="modal-label">Current Agent Key</label>
+        <input type="password" id="current-key" readonly />
+        <label class="modal-label">New Agent Key</label>
+        <input type="password" id="new-key" placeholder="0x..." />
+        <button class="primary" id="save-key">Save</button>
+      </div>
     </div>
+
+    <div id="qr-modal" class="modal hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>Top up</h2>
+          <button id="close-qr" class="icon">?</button>
+        </div>
+        <div class="qr">
+          <img id="qr-image" alt="QR" />
+          <p class="mono" id="qr-address"></p>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="popup.js"></script>
   </body>
 </html>

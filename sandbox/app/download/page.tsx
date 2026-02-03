@@ -1,38 +1,224 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 const DOWNLOAD_ENDPOINT = "/api/protected/download";
 
+type PaymentRequirement = {
+  amount: string;
+  asset: string;
+  recipient: string;
+  chain: string;
+  nonce: string;
+  description?: string;
+};
+
+type X402Accept = {
+  price?: string;
+  network?: string;
+  payTo?: string;
+  scheme?: string;
+  amount?: string;
+  asset?: string;
+  extra?: { name?: string; decimals?: number };
+  recipient?: string;
+  chain?: string;
+  nonce?: string;
+};
+
+const formatBaseUnits = (value: string, decimals: number) => {
+  const raw = value.replace(/^0+/, "") || "0";
+  if (decimals === 0) return raw;
+  const padded = raw.padStart(decimals + 1, "0");
+  const intPart = padded.slice(0, -decimals);
+  const fracPart = padded.slice(-decimals).replace(/0+$/, "");
+  return fracPart ? `${intPart}.${fracPart}` : intPart;
+};
+
+const normalizeRequirement = (accept: X402Accept): PaymentRequirement | null => {
+  if (accept.amount && accept.asset && accept.recipient && accept.chain && accept.nonce) {
+    return {
+      amount: accept.asset.startsWith("0x")
+        ? formatBaseUnits(accept.amount, accept.extra?.decimals ?? 6)
+        : accept.amount,
+      asset: accept.asset.startsWith("0x") ? "USDC" : accept.asset,
+      recipient: accept.recipient,
+      chain: accept.chain,
+      nonce: accept.nonce
+    };
+  }
+
+  if (accept.price && accept.payTo && accept.network) {
+    const amount = accept.price.replace("$", "");
+    const chain = accept.network.includes("84532") ? "base-sepolia" : accept.network;
+    return {
+      amount,
+      asset: "USDC",
+      recipient: accept.payTo,
+      chain,
+      nonce: `x402-${Date.now()}`
+    };
+  }
+
+  if (accept.amount && accept.asset && accept.payTo && accept.network) {
+    const chain = accept.network.includes("84532") ? "base-sepolia" : accept.network;
+    return {
+      amount: accept.asset.startsWith("0x")
+        ? formatBaseUnits(accept.amount, accept.extra?.decimals ?? 6)
+        : accept.amount,
+      asset: accept.asset.startsWith("0x") ? "USDC" : accept.asset,
+      recipient: accept.payTo,
+      chain,
+      nonce: `x402-${Date.now()}`
+    };
+  }
+
+  return null;
+};
+
+const decodeBase64Url = (value: string) => {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+  return atob(`${normalized}${pad}`);
+};
+
+const decodeRequirement = (header: string): PaymentRequirement | null => {
+  try {
+    const raw = header.trim().replace(/^\"|\"$/g, "");
+    const decoded = raw.startsWith("{")
+      ? (JSON.parse(raw) as { accepts: X402Accept[]; resource?: { description?: string } })
+      : (JSON.parse(decodeBase64Url(raw)) as {
+          accepts: X402Accept[];
+          resource?: { description?: string };
+        });
+    const accept = decoded.accepts?.[0];
+    if (!accept) return null;
+    const normalized = normalizeRequirement(accept);
+    if (!normalized) return null;
+    return {
+      ...normalized,
+      description: decoded.resource?.description
+    };
+  } catch {
+    return null;
+  }
+};
+
 export default function DownloadPage() {
-  const [status, setStatus] = useState("Idle");
+  const [status, setStatus] = useState("Loading...");
   const [token, setToken] = useState<string | null>(null);
+  const [detected, setDetected] = useState(false);
+  const [requirement, setRequirement] = useState<PaymentRequirement | null>(null);
+  const [buttonLabel, setButtonLabel] = useState("Pay");
+  const [buttonDisabled, setButtonDisabled] = useState(true);
+  const initializedRef = useRef(false);
 
-  const fetchDownload = async (withSignature: boolean) => {
-    setStatus("Loading...");
-    setToken(null);
-    try {
-      const response = await fetch(DOWNLOAD_ENDPOINT, {
-        headers: withSignature
-          ? {
-              "Payment-Signature": "mock-signature"
-            }
-          : undefined
-      });
+  const fetchDownload = async () => {
+    const response = await fetch(DOWNLOAD_ENDPOINT);
+    if (!response.ok) {
+      const header = response.headers.get("Payment-Required");
+      if (header) {
+        const parsed = decodeRequirement(header);
+        console.debug("[x402] Payment-Required header", header);
+        console.debug("[x402] Parsed requirement", parsed);
+        setRequirement(parsed);
+        setButtonDisabled(!parsed);
+        setButtonLabel(parsed ? (detected ? "Pay with Veyrun" : "Pay") : "Pay");
+        if (!parsed) {
+          setStatus("Payment header parse failed.");
+        }
+      }
+      setToken(null);
+      const lockedStatus = `Locked (status ${response.status}).`;
+      if (status !== lockedStatus) {
+        setStatus(lockedStatus);
+      }
+      return;
+    }
 
-      if (!response.ok) {
-        setStatus(`Locked (status ${response.status}).`);
-        return;
+    const data = await response.json();
+    setToken(data.token ?? "download-ready");
+    setStatus("Unlocked");
+    setButtonLabel("Unlocked");
+    setButtonDisabled(true);
+    console.debug("[x402] Unlocked: download");
+  };
+
+  const payWithVeyrun = async () => {
+    if (!requirement) return;
+    setStatus("Waiting for Veyrun...");
+    console.debug("[x402] Sending VEYRUN_PAY", requirement);
+    setButtonLabel("Waiting...");
+    setButtonDisabled(true);
+    const targetUrl = new URL(DOWNLOAD_ENDPOINT, window.location.origin).toString();
+    window.postMessage(
+      {
+        source: "veyrun-page",
+        type: "VEYRUN_PAY",
+        payload: {
+          requirement,
+          url: targetUrl,
+          method: "GET"
+        }
+      },
+      "*"
+    );
+  };
+
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.source !== window) return;
+      const data = event.data as { source?: string; type?: string; payload?: any };
+      if (data?.source !== "veyrun-extension") return;
+
+      if (data.type === "VEYRUN_READY") {
+        setDetected(true);
+        setButtonLabel(requirement ? "Pay with Veyrun" : "Pay");
+        setButtonDisabled(!requirement);
       }
 
-      const data = await response.json();
-      setToken(data.token ?? "demo-token");
-      setStatus("Unlocked");
-    } catch {
-      setStatus("Failed to load.");
+      if (data.type === "VEYRUN_PENDING") {
+        setStatus("Confirm payment in Veyrun extension...");
+        setButtonLabel("Confirm in Veyrun");
+        setButtonDisabled(true);
+      }
+
+      if (data.type === "VEYRUN_PAID") {
+        if (data.payload?.data?.token) {
+          setToken(data.payload.data.token);
+          setStatus("Unlocked");
+          setButtonLabel("Enjoy!");
+          setButtonDisabled(true);
+          console.debug("[x402] Unlocked via extension response");
+          return;
+        }
+        fetchDownload().catch(() => setStatus("Unlock failed."));
+      }
+
+      if (data.type === "VEYRUN_ERROR") {
+        setStatus(data.payload?.error ?? "Payment failed.");
+        setButtonLabel(detected ? "Pay with Veyrun" : "Pay");
+        setButtonDisabled(!requirement);
+      }
+    };
+
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [requirement]);
+
+  useEffect(() => {
+    if (requirement) {
+      setButtonLabel(detected ? "Pay with Veyrun" : "Pay");
+      setButtonDisabled(false);
     }
-  };
+  }, [detected, requirement]);
+
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    fetchDownload();
+  }, []);
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
@@ -42,28 +228,19 @@ export default function DownloadPage() {
         </Link>
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
           <h1 className="text-3xl font-semibold">Paywalled Download</h1>
-          <p className="mt-2 text-sm text-zinc-600">
-            {status}. Use the mock payment signature to unlock.
-          </p>
+          <p className="mt-2 text-sm text-zinc-600">{status}</p>
+          <div className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
+            {token ? `Token: ${token}` : "Download locked until payment is verified."}
+          </div>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
               className="rounded-full bg-zinc-900 px-5 py-2 text-sm font-semibold text-white"
-              onClick={() => fetchDownload(false)}
+              onClick={payWithVeyrun}
+              disabled={buttonDisabled}
             >
-              Fetch (locked)
-            </button>
-            <button
-              className="rounded-full border border-zinc-300 px-5 py-2 text-sm font-semibold"
-              onClick={() => fetchDownload(true)}
-            >
-              Fetch with mock signature
+              {buttonLabel}
             </button>
           </div>
-          {token ? (
-            <div className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
-              Token: <span className="font-mono">{token}</span>
-            </div>
-          ) : null}
         </div>
       </main>
     </div>
