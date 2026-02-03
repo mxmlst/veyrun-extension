@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Veyrun",
+  "version": "0.1.0",
+  "description": "Veyrun x402 unlocker (scaffold)",
+  "action": {
+    "default_title": "Veyrun",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["storage"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}

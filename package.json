@@ -1,0 +1,15 @@
+{
+  "name": "veyrun-extension",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "workspaces": [
+    "extension",
+    "sandbox",
+    "shared"
+  ],
+  "scripts": {
+    "dev:ext": "pnpm -C extension dev",
+    "dev:sandbox": "pnpm -C sandbox dev",
+    "build": "pnpm -C shared build && pnpm -C extension build && pnpm -C sandbox build"
+  }
+}

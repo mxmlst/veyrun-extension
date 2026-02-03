@@ -1,0 +1,17 @@
+{
+  "name": "@veyrun/extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/build.mjs --watch",
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "@veyrun/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.5",
+    "typescript": "^5.5.4"
+  }
+}
