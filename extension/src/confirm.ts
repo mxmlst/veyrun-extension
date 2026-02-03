@@ -32,6 +32,18 @@ const loadPending = async () => {
   }
 };
 
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type !== "paymentStatus") return;
+  if (typeof tabId === "number" && message.tabId !== tabId) return;
+  if (message.ok) {
+    confirmBtn.textContent = "Paid";
+    setTimeout(() => window.close(), 1200);
+  } else if (message.error) {
+    confirmBtn.textContent = "Confirm";
+    confirmBtn.disabled = false;
+  }
+});
+
 confirmBtn.addEventListener("click", async () => {
   confirmBtn.disabled = true;
   confirmBtn.textContent = "Paying...";

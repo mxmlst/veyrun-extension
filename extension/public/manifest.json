@@ -17,7 +17,7 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "permissions": ["storage", "webRequest", "tabs", "notifications", "windows"],
+  "permissions": ["storage", "webRequest", "tabs", "notifications", "windows", "downloads"],
   "host_permissions": ["<all_urls>"],
   "options_page": "debug.html",
   "content_scripts": [

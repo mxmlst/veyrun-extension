@@ -32,10 +32,43 @@ type PendingPayment = {
   nonce: string;
   url: string;
   method?: string;
+  description?: string;
+};
+
+type ReceiptRecord = {
+  receiptId?: string;
+  amount?: string;
+  asset?: string;
+  timestamp?: string;
+  proof?: string;
+  merchantId?: string;
+  resource?: string;
+  url: string;
+  description?: string;
+  transaction?: string;
+  payer?: string;
+  network?: string;
+  success?: boolean;
+  price?: string;
+};
+
+const normalizeReceipt = (receipt: ReceiptRecord) => {
+  const tx = receipt.proof ?? receipt.transaction ?? null;
+  let amount =
+    receipt.amount ??
+    (receipt.price ? receipt.price.replace("$", "") : undefined) ??
+    (receipt.network && receipt.network.includes("84532") ? "0.001" : undefined);
+  if (!amount) amount = "unknown";
+  const asset = receipt.asset ?? "USDC";
+  const description = receipt.description ?? "x402 Payment Required";
+  const timestamp = receipt.timestamp ?? "";
+  return { tx, amount, asset, description, timestamp };
 };
 
 const statusPill = document.getElementById("status-pill") as HTMLElement;
-const eventDomain = document.getElementById("event-domain") as HTMLElement;
+const eventCard = document.getElementById("event-card") as HTMLElement;
+const noX402 = document.getElementById("no-x402") as HTMLElement;
+const eventEndpoint = document.getElementById("event-endpoint") as HTMLElement;
 const eventAmount = document.getElementById("event-amount") as HTMLElement;
 const eventRecipient = document.getElementById("event-recipient") as HTMLElement;
 const eventTime = document.getElementById("event-time") as HTMLElement;
@@ -52,6 +85,9 @@ const topupBtn = document.getElementById("topup") as HTMLButtonElement;
 const createAgentBtn = document.getElementById("create-agent") as HTMLButtonElement;
 const changeAccountBtn = document.getElementById("change-account") as HTMLButtonElement;
 
+const historyList = document.getElementById("history-list") as HTMLElement;
+const exportHistoryBtn = document.getElementById("export-history") as HTMLButtonElement;
+
 const modal = document.getElementById("modal") as HTMLElement;
 const closeModal = document.getElementById("close-modal") as HTMLButtonElement;
 const currentKey = document.getElementById("current-key") as HTMLInputElement;
@@ -64,15 +100,11 @@ const qrImage = document.getElementById("qr-image") as HTMLImageElement;
 const qrAddress = document.getElementById("qr-address") as HTMLElement;
 
 let pendingPayment: PendingPayment | null = null;
+let receipts: ReceiptRecord[] = [];
 
 const truncate = (value: string, keep = 6) => {
   if (value.length <= keep * 2) return value;
   return `${value.slice(0, keep)}...${value.slice(-keep)}`;
-};
-
-const formatAsset = (asset: string) => {
-  if (asset.startsWith("0x")) return "USDC";
-  return asset;
 };
 
 const setStatus = (text: string) => {
@@ -85,17 +117,38 @@ const setWalletUI = (
   balance: string | null
 ) => {
   walletAddress.textContent = status?.address ? truncate(status.address, 6) : "Not set";
-  walletBalance.textContent = status?.address
-    ? `${balance ?? "0.00"} USDC`
-    : "-";
+  walletBalance.textContent = status?.address ? `${balance ?? "0.00"} USDC` : "-";
   walletChain.textContent = chain ? `${chain.name} (${chain.id})` : "-";
+};
+
+const formatAsset = (asset: string) => (asset.startsWith("0x") ? "USDC" : asset);
+const getExplorerUrl = (hash: string) => `https://sepolia.basescan.org/tx/${hash}`;
+
+const showX402 = (event: PaymentEvent) => {
+  eventCard.classList.remove("hidden");
+  noX402.classList.add("hidden");
+  const url = new URL(event.url);
+  eventEndpoint.textContent = `${url.pathname}${url.search}`;
+  const accepts = event.paymentRequired?.accepts?.[0];
+  const amount = accepts ? `${accepts.amount} ${formatAsset(accepts.asset)}` : "unknown";
+  const recipient = accepts?.recipient ?? "unknown";
+  eventAmount.textContent = amount;
+  eventRecipient.textContent = truncate(recipient, 8);
+  eventTime.textContent = new Date(event.timestamp).toLocaleTimeString();
+  setStatus("402");
+};
+
+const showNoX402 = () => {
+  eventCard.classList.add("hidden");
+  noX402.classList.remove("hidden");
+  payButton.disabled = true;
+  setStatus("Idle");
 };
 
 const loadEvent = async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
-    setStatus("Idle");
-    payButton.disabled = true;
+    showNoX402();
     return null;
   }
 
@@ -107,26 +160,11 @@ const loadEvent = async () => {
 
   if (response?.ok && response.event) {
     const event = response.event as PaymentEvent;
-    const host = new URL(event.url).hostname;
-    const accepts = event.paymentRequired?.accepts?.[0];
-    const amount = accepts
-      ? `${accepts.amount} ${formatAsset(accepts.asset)}`
-      : "unknown";
-    const recipient = accepts?.recipient ?? "unknown";
-    eventDomain.textContent = host;
-    eventAmount.textContent = amount;
-    eventRecipient.textContent = truncate(recipient, 8);
-    eventTime.textContent = new Date(event.timestamp).toLocaleTimeString();
-    setStatus("402");
+    showX402(event);
     return event;
   }
 
-  eventDomain.textContent = "-";
-  eventAmount.textContent = "-";
-  eventRecipient.textContent = "-";
-  eventTime.textContent = "-";
-  payButton.disabled = true;
-  setStatus("Idle");
+  showNoX402();
   return null;
 };
 
@@ -171,6 +209,83 @@ const loadPending = async () => {
     pendingRow.classList.add("hidden");
     payButton.textContent = "Pay with Veyrun";
   }
+};
+
+const renderHistory = () => {
+  historyList.innerHTML = "";
+  const filtered = receipts;
+
+  if (filtered.length === 0) {
+    historyList.textContent = "No receipts yet.";
+    return;
+  }
+
+  for (const receipt of filtered) {
+    const item = document.createElement("div");
+    item.className = "history-item";
+
+    const host = document.createElement("div");
+    try {
+      host.textContent = new URL(receipt.url).hostname;
+    } catch {
+      host.textContent = "Unknown site";
+    }
+
+    const desc = document.createElement("div");
+    desc.textContent = receipt.description ?? "x402 Payment Required";
+
+    const normalized = normalizeReceipt(receipt);
+    const title = document.createElement("div");
+    title.textContent = `${normalized.amount} ${formatAsset(normalized.asset)}${
+      normalized.timestamp ? " - " + new Date(normalized.timestamp).toLocaleString() : ""
+    }`;
+
+    const url = document.createElement("div");
+    url.className = "mono";
+    url.textContent = receipt.url;
+    url.addEventListener("click", () => {
+      if (normalized.tx && normalized.tx.startsWith("0x")) {
+        chrome.tabs.create({ url: getExplorerUrl(normalized.tx) });
+      }
+    });
+
+    const actions = document.createElement("div");
+    actions.className = "history-actions";
+
+    const relink = document.createElement("button");
+    relink.className = "secondary";
+    relink.textContent = "Re-unlock";
+    relink.addEventListener("click", async () => {
+      const response = await chrome.runtime.sendMessage({
+        type: "reunlockWithReceipt",
+        from: "popup",
+        receipt
+      });
+      if (response?.ok) {
+        setStatus("Unlocked");
+      } else {
+        setStatus(response?.error ?? "Unlock failed.");
+      }
+    });
+
+    actions.appendChild(relink);
+    item.appendChild(host);
+    item.appendChild(desc);
+    item.appendChild(title);
+    item.appendChild(url);
+    item.appendChild(actions);
+    historyList.appendChild(item);
+  }
+};
+
+const loadHistory = async () => {
+  const response = await chrome.runtime.sendMessage({
+    type: "getReceipts",
+    from: "popup"
+  });
+  receipts = response?.ok ? (response.receipts as ReceiptRecord[]) : [];
+  receipts = receipts.filter((receipt) => receipt.proof !== "mock-proof");
+  renderHistory();
 };
 
 const openModal = async () => {
@@ -287,12 +402,37 @@ saveKey?.addEventListener("click", async () => {
   }
 });
 
+exportHistoryBtn?.addEventListener("click", async () => {
+  const response = await chrome.runtime.sendMessage({
+    type: "getReceipts",
+    from: "popup"
+  });
+  if (response?.ok) {
+    const blob = new Blob([JSON.stringify(response.receipts, null, 2)], {
+      type: "application/json"
+    });
+    const url = URL.createObjectURL(blob);
+    await chrome.downloads.download({
+      url,
+      filename: "veyrun-receipts.json"
+    });
+    URL.revokeObjectURL(url);
+  }
+});
+
 payButton?.addEventListener("click", payWithVeyrun);
 
 const init = async () => {
   await loadEvent();
   await loadWalletStatus();
   await loadPending();
+  await loadHistory();
 };
 
 init();
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === "paymentStatus" && message.ok) {
+    loadHistory();
+  }
+});

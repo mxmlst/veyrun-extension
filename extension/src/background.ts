@@ -33,7 +33,9 @@ type Message =
       method?: string;
     }
   | { type: "getPendingPayment"; from: "popup"; tabId: number }
-  | { type: "confirmPendingPayment"; from: "popup"; tabId: number };
+  | { type: "confirmPendingPayment"; from: "popup"; tabId: number }
+  | { type: "getReceipts"; from: "popup" }
+  | { type: "reunlockWithReceipt"; from: "popup"; receipt: ReceiptRecord };
 
 type PaymentRequiredPayload = {
   version: string;
@@ -135,6 +137,11 @@ type ReceiptRecord = {
   resource: string;
   url: string;
   txHash?: string;
+  description?: string;
+  transaction?: string;
+  network?: string;
+  payer?: string;
+  success?: boolean;
 };
 
 const TTL_MS = 5 * 60 * 1000;
@@ -169,11 +176,16 @@ const parsePaymentRequired = (value: string | null) => {
     const cleaned = cleanHeaderValue(value);
     const tryParse = (raw: string) => {
       if (raw.startsWith("{")) {
-        return JSON.parse(raw) as { version?: string; accepts?: X402Accept[] };
+        return JSON.parse(raw) as {
+          version?: string;
+          accepts?: X402Accept[];
+          resource?: { description?: string };
+        };
       }
       return JSON.parse(decodeBase64(raw)) as {
         version?: string;
         accepts?: X402Accept[];
+        resource?: { description?: string };
       };
     };
 
@@ -187,6 +199,7 @@ const parsePaymentRequired = (value: string | null) => {
     }
 
     if (!parsed?.accepts?.length) return null;
+    const description = parsed.resource?.description ?? "x402 Payment Required";
     const normalized = parsed.accepts
       .map((accept) => {
         const resolved: X402Accept = {
@@ -200,7 +213,10 @@ const parsePaymentRequired = (value: string | null) => {
             (accept as unknown as { chain?: string }).chain ??
             (accept as unknown as { chain_id?: string }).chain_id,
         };
-        return normalizeAccept(resolved);
+        const normalizedAccept = normalizeAccept(resolved);
+        return normalizedAccept
+          ? { ...normalizedAccept, description }
+          : null;
       })
       .filter(Boolean) as PaymentRequiredPayload["accepts"];
     if (!normalized.length) return null;
@@ -213,11 +229,47 @@ const parsePaymentRequired = (value: string | null) => {
 const parsePaymentResponse = (value: string | null) => {
   if (!value) return null;
   try {
-    const decoded = decodeBase64(value);
-    return JSON.parse(decoded) as Omit<ReceiptRecord, "url">;
+    const cleaned = cleanHeaderValue(value);
+    const tryParse = (raw: string) => {
+      if (raw.startsWith("{")) {
+        return JSON.parse(raw) as Omit<ReceiptRecord, "url">;
+      }
+      return JSON.parse(decodeBase64(raw)) as Omit<ReceiptRecord, "url">;
+    };
+    try {
+      return tryParse(cleaned);
+    } catch {
+      if (cleaned.includes("%")) {
+        return tryParse(decodeURIComponent(cleaned));
+      }
+      return null;
+    }
   } catch {
     return null;
   }
+};
+
+const storeReceipt = async (receipt: ReceiptRecord) => {
+  if (receipt.proof === "mock-proof") {
+    return;
+  }
+  const stored = await chrome.storage.local.get(RECEIPT_KEY);
+  const receipts = (stored?.[RECEIPT_KEY] as ReceiptRecord[]) ?? [];
+  const filtered = receipts.filter((item) => item.proof !== "mock-proof");
+  filtered.unshift(receipt);
+  await chrome.storage.local.set({ [RECEIPT_KEY]: filtered });
+};
+
+const broadcastPaymentStatus = (payload: {
+  tabId?: number;
+  ok: boolean;
+  receipt?: ReceiptRecord;
+  error?: string;
+}) => {
+  chrome.runtime.sendMessage({
+    type: "paymentStatus",
+    ...payload
+  });
 };
 
 const executePayment = async (url: string, method = "GET") => {
@@ -407,7 +459,7 @@ chrome.runtime.onMessage.addListener(
       return true;
     }
 
-    if (message.type === "payWithVeyrun") {
+  if (message.type === "payWithVeyrun") {
       const event = eventsByTab.get(message.tabId);
       if (!isFresh(event)) {
         sendResponse({ ok: false, error: "No recent 402 event." });
@@ -429,25 +481,31 @@ chrome.runtime.onMessage.addListener(
         return true;
       }
 
-      executePayment(event.url, event.method)
-        .then(async ({ receipt, data }) => {
-          const result: ReceiptRecord = {
-            ...receipt,
-            url: event.url,
-          };
+    executePayment(event.url, event.method)
+      .then(async ({ receipt, data }) => {
+        const result: ReceiptRecord = {
+          ...receipt,
+          url: event.url,
+          description: requirement.description,
+          amount:
+            receipt.amount ??
+            requirement.amount ??
+            (receipt.network?.includes("84532") ? "0.001" : "unknown"),
+          asset: receipt.asset ?? requirement.asset ?? "USDC",
+          merchantId: receipt.merchantId ?? requirement.recipient
+        };
 
-          const stored = await chrome.storage.local.get(RECEIPT_KEY);
-          const receipts = (stored?.[RECEIPT_KEY] as ReceiptRecord[]) ?? [];
-          receipts.unshift(result);
-          await chrome.storage.local.set({ [RECEIPT_KEY]: receipts });
+        await storeReceipt(result);
 
-          sendResponse({ ok: true, receipt: result, data });
-        })
-        .catch((error: Error) =>
-          sendResponse({ ok: false, error: error.message }),
-        );
-      return true;
-    }
+        broadcastPaymentStatus({ ok: true, receipt: result, tabId: message.tabId });
+        sendResponse({ ok: true, receipt: result, data });
+      })
+      .catch((error: Error) => {
+        broadcastPaymentStatus({ ok: false, error: error.message, tabId: message.tabId });
+        sendResponse({ ok: false, error: error.message });
+      });
+    return true;
+  }
 
     if (message.type === "payWithVeyrunDirect") {
       const now = Date.now();
@@ -499,33 +557,100 @@ chrome.runtime.onMessage.addListener(
       return true;
     }
 
-    if (message.type === "confirmPendingPayment") {
+  if (message.type === "confirmPendingPayment") {
       const pending = pendingByTab.get(message.tabId);
       if (!pending) {
         sendResponse({ ok: false, error: "No pending payment." });
         return true;
       }
-      pendingByTab.delete(message.tabId);
-      executePayment(pending.url, pending.method)
-        .then(({ receipt, data }) => {
-          chrome.tabs.sendMessage(message.tabId, {
-            type: "paymentResult",
-            ok: true,
-            receipt,
-            data,
-          });
-          sendResponse({ ok: true, receipt, data });
-        })
-        .catch((error: Error) => {
-          chrome.tabs.sendMessage(message.tabId, {
-            type: "paymentResult",
-            ok: false,
-            error: error.message,
-          });
-          sendResponse({ ok: false, error: error.message });
+    pendingByTab.delete(message.tabId);
+    executePayment(pending.url, pending.method)
+      .then(({ receipt, data }) => {
+        const result: ReceiptRecord = {
+          ...receipt,
+          url: pending.url,
+          description: pending.description,
+          amount:
+            receipt.amount ??
+            pending.amount ??
+            (receipt.network?.includes("84532") ? "0.001" : "unknown"),
+          asset: receipt.asset ?? pending.asset ?? "USDC",
+          merchantId: receipt.merchantId ?? pending.recipient
+        };
+        chrome.tabs.sendMessage(message.tabId, {
+          type: "paymentResult",
+          ok: true,
+          receipt,
+          data,
         });
+        storeReceipt(result).catch(() => undefined);
+        broadcastPaymentStatus({ ok: true, receipt: result, tabId: message.tabId });
+        sendResponse({ ok: true, receipt: result, data });
+      })
+      .catch((error: Error) => {
+        chrome.tabs.sendMessage(message.tabId, {
+          type: "paymentResult",
+          ok: false,
+          error: error.message,
+        });
+        broadcastPaymentStatus({ ok: false, error: error.message, tabId: message.tabId });
+        sendResponse({ ok: false, error: error.message });
+      });
+    return true;
+  }
+
+    if (message.type === "getReceipts") {
+      chrome.storage.local
+        .get(RECEIPT_KEY)
+        .then((stored) => {
+          const receipts = (stored?.[RECEIPT_KEY] as ReceiptRecord[]) ?? [];
+          const normalized = receipts
+            .filter((receipt) => receipt.proof !== "mock-proof")
+            .map((receipt) => {
+              const withAmount =
+                !receipt.amount && receipt.network?.includes("84532")
+                  ? { ...receipt, amount: "0.001" }
+                  : receipt;
+              return {
+                ...withAmount,
+                asset: withAmount.asset ?? "USDC",
+                description: withAmount.description ?? "x402 Payment Required",
+              };
+            });
+          sendResponse({ ok: true, receipts: normalized });
+        })
+        .catch((error: Error) => sendResponse({ ok: false, error: error.message }));
       return true;
     }
+
+  if (message.type === "reunlockWithReceipt") {
+    const receipt = message.receipt;
+    const paymentReceipt = {
+      txHash: receipt.proof,
+      recipient: receipt.merchantId,
+      amount: receipt.amount
+    };
+    fetch(receipt.url, {
+      method: "GET",
+      headers: {
+        "Payment-Receipt": JSON.stringify(paymentReceipt)
+      }
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Unlock failed (${response.status}).`);
+        }
+        let data: unknown = null;
+        try {
+          data = await response.clone().json();
+        } catch {
+          data = null;
+        }
+        sendResponse({ ok: true, data });
+      })
+      .catch((error: Error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
 
     return false;
   },
