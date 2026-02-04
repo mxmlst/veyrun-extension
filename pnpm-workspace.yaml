@@ -2,3 +2,4 @@ packages:
   - "extension"
   - "sandbox"
   - "shared"
+  - "veyrun"
