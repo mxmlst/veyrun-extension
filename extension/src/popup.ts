@@ -84,7 +84,6 @@ const walletChain = document.getElementById("wallet-chain") as HTMLElement;
 const copyBtn = document.getElementById("copy-address") as HTMLButtonElement;
 const refreshBtn = document.getElementById("refresh-balance") as HTMLButtonElement;
 const topupBtn = document.getElementById("topup") as HTMLButtonElement;
-const createAgentBtn = document.getElementById("create-agent") as HTMLButtonElement;
 const changeAccountBtn = document.getElementById("change-account") as HTMLButtonElement;
 
 const historyList = document.getElementById("history-list") as HTMLElement;
@@ -367,6 +366,8 @@ copyBtn?.addEventListener("click", async () => {
   });
   if (response?.ok && response.status?.address) {
     await navigator.clipboard.writeText(response.status.address as string);
+    copyBtn.classList.add("copied");
+    setTimeout(() => copyBtn.classList.remove("copied"), 1200);
   }
 });
 
@@ -375,16 +376,6 @@ refreshBtn?.addEventListener("click", async () => {
 });
 
 topupBtn?.addEventListener("click", openQr);
-
-createAgentBtn?.addEventListener("click", async () => {
-  const response = await browser.runtime.sendMessage({
-    type: "walletCreate",
-    from: "popup"
-  });
-  if (response?.ok) {
-    await loadWalletStatus();
-  }
-});
 
 changeAccountBtn?.addEventListener("click", openModal);
 closeModal?.addEventListener("click", closeModalUI);

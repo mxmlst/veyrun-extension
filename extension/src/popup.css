@@ -70,6 +70,10 @@ h1 {
   margin-bottom: 6px;
 }
 
+.row.justify {
+  align-items: center;
+}
+
 .label {
   font-size: 12px;
   color: #9ca3af;
@@ -78,6 +82,16 @@ h1 {
 .value {
   font-size: 12px;
   color: #e5e7eb;
+}
+
+.value-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.value-group .value {
+  text-align: right;
 }
 
 .mono {
@@ -99,6 +113,10 @@ button {
   padding: 8px 12px;
   font-size: 12px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 button:disabled {
@@ -139,7 +157,8 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 24px 16px 16px;
+  z-index: 50;
 }
 
 .modal-card {
@@ -152,6 +171,8 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  position: relative;
+  z-index: 51;
 }
 
 .modal-header {
@@ -183,6 +204,52 @@ input {
   background: transparent;
   color: #9ca3af;
   border-radius: 0;
+  border: none;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-button svg,
+.icon svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-only {
+  width: 24px;
+  height: 24px;
+}
+
+.icon-button.icon-only {
+  padding: 4px;
+  justify-content: center;
+  background: transparent;
+  border: none;
+}
+
+.icon-button:hover,
+.secondary:hover,
+.ghost:hover {
+  background: #151922;
+  border-color: #2f3746;
+  color: #ffffff;
+}
+
+.icon-button:active,
+.secondary:active,
+.ghost:active {
+  background: #0f141c;
+}
+
+.copied {
+  color: #22c55e;
 }
 
 .hidden {
@@ -211,6 +278,7 @@ input {
   flex: 1;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  padding: 12px 16px 16px;
 }
 
 .scroll::-webkit-scrollbar {
@@ -227,7 +295,7 @@ input {
 #wallet-card {
   background: #111418;
   border: 1px solid #1f242c;
-  padding: 12px 12px;
+  padding: 12px 16px;
 }
 
 .history-list {
@@ -242,10 +310,21 @@ input {
   border-radius: 0;
   padding: 8px;
   font-size: 12px;
+  position: relative;
 }
 
 .history-item .mono {
   font-size: 10px;
+}
+
+.history-item::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border: 1px solid #2a3340;
+  display: inline-block;
+  margin-right: 8px;
+  vertical-align: middle;
 }
 
 .history-actions {
