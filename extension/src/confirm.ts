@@ -1,3 +1,5 @@
+import browser from "webextension-polyfill";
+
 const amountEl = document.getElementById("amount");
 const recipientShortEl = document.getElementById("recipient-short");
 const confirmBtn = document.getElementById("confirm");
@@ -14,7 +16,7 @@ const truncate = (value, keep = 6) => {
 };
 
 const loadPending = async () => {
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "getPendingPayment",
     from: "popup",
     tabId
@@ -32,7 +34,7 @@ const loadPending = async () => {
   }
 };
 
-chrome.runtime.onMessage.addListener((message) => {
+browser.runtime.onMessage.addListener((message) => {
   if (message?.type !== "paymentStatus") return;
   if (typeof tabId === "number" && message.tabId !== tabId) return;
   if (message.ok) {
@@ -47,7 +49,7 @@ chrome.runtime.onMessage.addListener((message) => {
 confirmBtn.addEventListener("click", async () => {
   confirmBtn.disabled = true;
   confirmBtn.textContent = "Paying...";
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "confirmPendingPayment",
     from: "popup",
     tabId

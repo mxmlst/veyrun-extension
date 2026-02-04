@@ -1,3 +1,5 @@
+import browser from "webextension-polyfill";
+
 const post = (type: string, payload?: unknown) => {
   window.postMessage({ source: "veyrun-extension", type, payload }, "*");
 };
@@ -7,7 +9,7 @@ const handlePay = async (payload: {
   url: string;
   method?: string;
 }) => {
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "payWithVeyrunDirect",
     from: "content",
     requirement: payload.requirement,
@@ -27,7 +29,7 @@ const handlePay = async (payload: {
   }
 };
 
-chrome.runtime.onMessage.addListener((message) => {
+browser.runtime.onMessage.addListener((message) => {
   if (message?.type === "paymentResult") {
     if (message.ok) {
       post("VEYRUN_PAID", { receipt: message.receipt, data: message.data });

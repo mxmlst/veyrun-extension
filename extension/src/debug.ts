@@ -1,3 +1,5 @@
+import browser from "webextension-polyfill";
+
 const input = document.getElementById("input");
 const output = document.getElementById("output");
 const parseBtn = document.getElementById("parse");
@@ -5,7 +7,7 @@ const parseBtn = document.getElementById("parse");
 parseBtn?.addEventListener("click", async () => {
   output.textContent = "Parsing...";
   const value = input.value.trim();
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "parsePaymentRequired",
     from: "debug",
     value

@@ -1,3 +1,5 @@
+import browser from "webextension-polyfill";
+
 type WalletStatus = {
   hasWallet: boolean;
   address: string | null;
@@ -146,13 +148,13 @@ const showNoX402 = () => {
 };
 
 const loadEvent = async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
     showNoX402();
     return null;
   }
 
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "getLastEvent",
     from: "popup",
     tabId: tab.id
@@ -170,7 +172,7 @@ const loadEvent = async () => {
 
 const fetchBalance = async (address: string | null) => {
   if (!address) return null;
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "walletUsdcBalance",
     from: "popup",
     address
@@ -180,8 +182,8 @@ const fetchBalance = async (address: string | null) => {
 
 const loadWalletStatus = async () => {
   const [statusResponse, chainResponse] = await Promise.all([
-    chrome.runtime.sendMessage({ type: "walletStatus", from: "popup" }),
-    chrome.runtime.sendMessage({ type: "walletChain", from: "popup" })
+    browser.runtime.sendMessage({ type: "walletStatus", from: "popup" }),
+    browser.runtime.sendMessage({ type: "walletChain", from: "popup" })
   ]);
 
   const status = statusResponse?.ok ? (statusResponse.status as WalletStatus) : null;
@@ -192,9 +194,9 @@ const loadWalletStatus = async () => {
 };
 
 const loadPending = async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return;
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "getPendingPayment",
     from: "popup",
     tabId: tab.id
@@ -245,7 +247,7 @@ const renderHistory = () => {
     url.textContent = receipt.url;
     url.addEventListener("click", () => {
       if (normalized.tx && normalized.tx.startsWith("0x")) {
-        chrome.tabs.create({ url: getExplorerUrl(normalized.tx) });
+        browser.tabs.create({ url: getExplorerUrl(normalized.tx) });
       }
     });
 
@@ -256,7 +258,7 @@ const renderHistory = () => {
     relink.className = "secondary";
     relink.textContent = "Re-unlock";
     relink.addEventListener("click", async () => {
-      const response = await chrome.runtime.sendMessage({
+      const response = await browser.runtime.sendMessage({
         type: "reunlockWithReceipt",
         from: "popup",
         receipt
@@ -279,7 +281,7 @@ const renderHistory = () => {
 };
 
 const loadHistory = async () => {
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "getReceipts",
     from: "popup"
   });
@@ -289,7 +291,7 @@ const loadHistory = async () => {
 };
 
 const openModal = async () => {
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "walletGetPrivateKey",
     from: "popup"
   });
@@ -303,7 +305,7 @@ const closeModalUI = () => {
 };
 
 const openQr = async () => {
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "walletStatus",
     from: "popup"
   });
@@ -321,11 +323,11 @@ const closeQrUI = () => {
 };
 
 const confirmPending = async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return;
   payButton.disabled = true;
   payButton.textContent = "Paying...";
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "confirmPendingPayment",
     from: "popup",
     tabId: tab.id
@@ -343,11 +345,11 @@ const payWithVeyrun = async () => {
     await confirmPending();
     return;
   }
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return;
   payButton.disabled = true;
   payButton.textContent = "Paying...";
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "payWithVeyrun",
     from: "popup",
     tabId: tab.id
@@ -359,7 +361,7 @@ const payWithVeyrun = async () => {
 };
 
 copyBtn?.addEventListener("click", async () => {
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "walletStatus",
     from: "popup"
   });
@@ -375,7 +377,7 @@ refreshBtn?.addEventListener("click", async () => {
 topupBtn?.addEventListener("click", openQr);
 
 createAgentBtn?.addEventListener("click", async () => {
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "walletCreate",
     from: "popup"
   });
@@ -391,7 +393,7 @@ closeQr?.addEventListener("click", closeQrUI);
 saveKey?.addEventListener("click", async () => {
   const newValue = newKey.value.trim();
   if (!newValue) return;
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "walletImport",
     from: "popup",
     privateKey: newValue
@@ -403,7 +405,7 @@ saveKey?.addEventListener("click", async () => {
 });
 
 exportHistoryBtn?.addEventListener("click", async () => {
-  const response = await chrome.runtime.sendMessage({
+  const response = await browser.runtime.sendMessage({
     type: "getReceipts",
     from: "popup"
   });
@@ -412,7 +414,7 @@ exportHistoryBtn?.addEventListener("click", async () => {
       type: "application/json"
     });
     const url = URL.createObjectURL(blob);
-    await chrome.downloads.download({
+    await browser.downloads.download({
       url,
       filename: "veyrun-receipts.json"
     });
@@ -431,7 +433,7 @@ const init = async () => {
 
 init();
 
-chrome.runtime.onMessage.addListener((message) => {
+browser.runtime.onMessage.addListener((message) => {
   if (message?.type === "paymentStatus" && message.ok) {
     loadHistory();
   }

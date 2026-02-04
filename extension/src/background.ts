@@ -1,4 +1,5 @@
 import { HEADER_PAYMENT_REQUIRED } from "@veyrun/shared";
+import browser from "webextension-polyfill";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import { wrapFetchWithPayment, x402Client, x402HTTPClient } from "@x402/fetch";
 import {
@@ -36,6 +37,8 @@ type Message =
   | { type: "confirmPendingPayment"; from: "popup"; tabId: number }
   | { type: "getReceipts"; from: "popup" }
   | { type: "reunlockWithReceipt"; from: "popup"; receipt: ReceiptRecord };
+
+const actionApi = (browser as any).action ?? (browser as any).browserAction;
 
 type PaymentRequiredPayload = {
   version: string;
@@ -253,11 +256,11 @@ const storeReceipt = async (receipt: ReceiptRecord) => {
   if (receipt.proof === "mock-proof") {
     return;
   }
-  const stored = await chrome.storage.local.get(RECEIPT_KEY);
+  const stored = await browser.storage.local.get(RECEIPT_KEY);
   const receipts = (stored?.[RECEIPT_KEY] as ReceiptRecord[]) ?? [];
   const filtered = receipts.filter((item) => item.proof !== "mock-proof");
   filtered.unshift(receipt);
-  await chrome.storage.local.set({ [RECEIPT_KEY]: filtered });
+  await browser.storage.local.set({ [RECEIPT_KEY]: filtered });
 };
 
 const broadcastPaymentStatus = (payload: {
@@ -266,7 +269,7 @@ const broadcastPaymentStatus = (payload: {
   receipt?: ReceiptRecord;
   error?: string;
 }) => {
-  chrome.runtime.sendMessage({
+  browser.runtime.sendMessage({
     type: "paymentStatus",
     ...payload
   });
@@ -314,23 +317,28 @@ const isFresh = (event: PaymentEvent | undefined) =>
 const updateBadgeForTab = async (tabId: number) => {
   const event = eventsByTab.get(tabId);
   if (isFresh(event)) {
-    await chrome.action.setBadgeText({ tabId, text: "1" });
-    await chrome.action.setBadgeBackgroundColor({ tabId, color: "#111827" });
+    await actionApi.setBadgeText({ tabId, text: "1" });
+    await actionApi.setBadgeBackgroundColor({ tabId, color: "#111827" });
   } else {
-    await chrome.action.setBadgeText({ tabId, text: "" });
+    await actionApi.setBadgeText({ tabId, text: "" });
   }
 };
 
-chrome.runtime.onInstalled.addListener(() => {
+browser.runtime.onInstalled.addListener(() => {
   console.log("Veyrun extension installed");
   ensureWallet();
 });
 
-chrome.runtime.onStartup?.addListener(() => {
+browser.runtime.onStartup?.addListener(() => {
   ensureWallet();
 });
 
-chrome.webRequest.onHeadersReceived.addListener(
+const responseHeadersOptions: any[] = ["responseHeaders"];
+if (!("getBrowserInfo" in browser.runtime)) {
+  responseHeadersOptions.push("extraHeaders");
+}
+
+browser.webRequest.onHeadersReceived.addListener(
   (details) => {
     if (details.statusCode !== 402 || !details.tabId || details.tabId < 0) {
       return;
@@ -358,19 +366,19 @@ chrome.webRequest.onHeadersReceived.addListener(
     updateBadgeForTab(details.tabId);
   },
   { urls: ["<all_urls>"] },
-  ["responseHeaders", "extraHeaders"],
+  responseHeadersOptions,
 );
 
-chrome.tabs.onActivated.addListener((activeInfo) => {
+browser.tabs.onActivated.addListener((activeInfo) => {
   updateBadgeForTab(activeInfo.tabId);
 });
 
-chrome.tabs.onRemoved.addListener((tabId) => {
+browser.tabs.onRemoved.addListener((tabId) => {
   eventsByTab.delete(tabId);
   pendingByTab.delete(tabId);
 });
 
-chrome.runtime.onMessage.addListener(
+browser.runtime.onMessage.addListener(
   (message: Message, sender, sendResponse) => {
     if (message.type === "ping") {
       sendResponse({ ok: true });
@@ -527,29 +535,26 @@ chrome.runtime.onMessage.addListener(
         url: message.url,
         method: message.method,
       });
-      chrome.notifications.create({
+      browser.notifications.create({
         type: "basic",
         iconUrl: "icon.png",
         title: "Veyrun payment pending",
         message: "Open the Veyrun extension to confirm payment.",
       });
-      const confirmUrl = chrome.runtime.getURL(`confirm.html?tabId=${tabId}`);
-      chrome.windows.create(
-        {
-          url: confirmUrl,
-          type: "popup",
-          width: 360,
-          height: 500,
-        },
-        () => {
-          if (chrome.runtime.lastError) {
-            chrome.tabs.create({ url: confirmUrl });
-          }
-        },
-      );
-      sendResponse({ ok: true, pending: true });
-      return true;
-    }
+        const confirmUrl = browser.runtime.getURL(`confirm.html?tabId=${tabId}`);
+        browser.windows
+          .create({
+            url: confirmUrl,
+            type: "popup",
+            width: 360,
+            height: 500,
+          })
+          .catch(() => browser.tabs.create({ url: confirmUrl }))
+          .finally(() => {
+            sendResponse({ ok: true, pending: true });
+          });
+        return true;
+      }
 
     if (message.type === "getPendingPayment") {
       const pending = pendingByTab.get(message.tabId) ?? null;
@@ -577,7 +582,7 @@ chrome.runtime.onMessage.addListener(
           asset: receipt.asset ?? pending.asset ?? "USDC",
           merchantId: receipt.merchantId ?? pending.recipient
         };
-        chrome.tabs.sendMessage(message.tabId, {
+        browser.tabs.sendMessage(message.tabId, {
           type: "paymentResult",
           ok: true,
           receipt,
@@ -588,7 +593,7 @@ chrome.runtime.onMessage.addListener(
         sendResponse({ ok: true, receipt: result, data });
       })
       .catch((error: Error) => {
-        chrome.tabs.sendMessage(message.tabId, {
+        browser.tabs.sendMessage(message.tabId, {
           type: "paymentResult",
           ok: false,
           error: error.message,
@@ -600,7 +605,7 @@ chrome.runtime.onMessage.addListener(
   }
 
     if (message.type === "getReceipts") {
-      chrome.storage.local
+      browser.storage.local
         .get(RECEIPT_KEY)
         .then((stored) => {
           const receipts = (stored?.[RECEIPT_KEY] as ReceiptRecord[]) ?? [];

@@ -1,0 +1,51 @@
+{
+  "manifest_version": 2,
+  "name": "Veyrun",
+  "version": "0.1.0",
+  "description": "Veyrun x402 unlocker (scaffold)",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "veyrun@local",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
+  "browser_action": {
+    "default_title": "Veyrun",
+    "default_popup": "popup.html",
+    "default_icon": "icon-16.png"
+  },
+  "icons": {
+    "16": "icon-16.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+  "permissions": [
+    "storage",
+    "webRequest",
+    "webRequestBlocking",
+    "tabs",
+    "notifications",
+    "downloads",
+    "<all_urls>"
+  ],
+  "data_collection_permissions": {
+    "required": ["none"]
+  },
+  "options_ui": {
+    "page": "debug.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}

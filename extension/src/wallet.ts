@@ -1,4 +1,5 @@
 import { createPublicClient, erc20Abi, formatUnits, http, parseUnits } from "viem";
+import browser from "webextension-polyfill";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 
@@ -20,12 +21,12 @@ const STORAGE_KEY = "veyrun_wallet";
 const USDC_BASE_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
 const loadRecord = async (): Promise<WalletRecord | null> => {
-  const result = await chrome.storage.local.get(STORAGE_KEY);
+  const result = await browser.storage.local.get(STORAGE_KEY);
   return (result?.[STORAGE_KEY] as WalletRecord) ?? null;
 };
 
 const saveRecord = async (record: WalletRecord) => {
-  await chrome.storage.local.set({ [STORAGE_KEY]: record });
+  await browser.storage.local.set({ [STORAGE_KEY]: record });
 };
 
 export const ensureWallet = async () => {
