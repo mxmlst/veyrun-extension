@@ -82,7 +82,7 @@ const walletAddress = document.getElementById("wallet-address") as HTMLElement;
 const walletBalance = document.getElementById("wallet-balance") as HTMLElement;
 const walletChain = document.getElementById("wallet-chain") as HTMLElement;
 const copyBtn = document.getElementById("copy-address") as HTMLButtonElement;
-const refreshBtn = document.getElementById("refresh-balance") as HTMLButtonElement;
+const viewWalletBtn = document.getElementById("view-wallet") as HTMLButtonElement;
 const topupBtn = document.getElementById("topup") as HTMLButtonElement;
 const changeAccountBtn = document.getElementById("change-account") as HTMLButtonElement;
 
@@ -120,7 +120,7 @@ const setWalletUI = (
   balance: string | null
 ) => {
   walletAddress.textContent = status?.address ? truncate(status.address, 6) : "Not set";
-  walletBalance.textContent = status?.address ? `${balance ?? "0.00"} USDC` : "-";
+  walletBalance.textContent = status?.address ? `${balance ?? "0.00"}` : "-";
   walletChain.textContent = chain ? `${chain.name} (${chain.id})` : "-";
 };
 
@@ -372,8 +372,15 @@ copyBtn?.addEventListener("click", async () => {
   }
 });
 
-refreshBtn?.addEventListener("click", async () => {
-  await loadWalletStatus();
+viewWalletBtn?.addEventListener("click", async () => {
+  const response = await browser.runtime.sendMessage({
+    type: "walletStatus",
+    from: "popup"
+  });
+  const address = response?.ok ? response.status?.address : null;
+  if (address) {
+    browser.tabs.create({ url: `https://sepolia.basescan.org/address/${address}` });
+  }
 });
 
 topupBtn?.addEventListener("click", openQr);

@@ -41,7 +41,6 @@ body {
   flex-direction: column;
   gap: 5px;
   overflow-y: auto;
-  padding: 0px;
   scrollbar-width: none;
 }
 
@@ -54,7 +53,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 16px;
+  padding: 8px 18px;
 }
 
 .header-actions {
@@ -89,10 +88,6 @@ h1 {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-#wallet-card {
-  background: var(--bg2);
-}
-
 .section-title {
   font-size: 10px;
   letter-spacing: 0.22em;
@@ -104,6 +99,57 @@ h1 {
   position: sticky;
   top: 0;
   z-index: 2;
+}
+
+#wallet-card {
+  background: var(--bg2);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+
+.wallet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.wallet-balance {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.wallet-amount {
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text0);
+}
+
+.wallet-unit {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+
+.wallet-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.wallet-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.wallet-topup {
+  flex: 0 0 45%;
+  text-align: center;
 }
 
 .keyvalue {
@@ -162,7 +208,7 @@ button {
   border: 1px solid var(--line);
   background: transparent;
   color: var(--text0);
-  padding: 10px 12px;
+  padding: 0 12px;
   text-transform: uppercase;
   letter-spacing: 0.18em;
   font-size: 10px;
@@ -171,6 +217,11 @@ button {
     background 0.15s ease,
     border-color 0.15s ease,
     color 0.15s ease;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 button:focus-visible {
@@ -234,9 +285,9 @@ button:disabled {
 .icon-button {
   border: 1px solid var(--line);
   background: transparent;
-  padding: 6px;
-  width: 28px;
-  height: 28px;
+  padding: 0;
+  width: 36px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -255,7 +306,7 @@ button:disabled {
 .icon-only {
   text-transform: none;
   letter-spacing: 0;
-  padding: 6px;
+  padding: 0;
 }
 
 .hidden {
@@ -319,13 +370,6 @@ button:disabled {
   align-items: center;
 }
 
-.modal-label {
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--text2);
-}
-
 .modal-header h2 {
   margin: 0;
   font-size: 12px;
@@ -334,12 +378,11 @@ button:disabled {
   color: var(--text0);
 }
 
-.modal-header .icon-button,
-.modal-header .icon {
-  border: 1px solid var(--line);
-  background: transparent;
-  width: 28px;
-  height: 28px;
+.modal-label {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text2);
 }
 
 input {
@@ -374,7 +417,6 @@ input:focus {
   margin: 0;
 }
 
-/* Confirm window */
 .shell {
   height: 100%;
   width: 100%;
