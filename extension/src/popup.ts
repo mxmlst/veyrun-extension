@@ -256,27 +256,19 @@ const renderHistory = () => {
     const actions = document.createElement("div");
     actions.className = "history-actions";
 
-    const relink = document.createElement("button");
-    relink.className = "secondary";
-    relink.textContent = "Unlock";
-    relink.addEventListener("click", async () => {
-      const response = await browser.runtime.sendMessage({
-        type: "reunlockWithReceipt",
-        from: "popup",
-        receipt
-      });
-      if (response?.ok) {
-        setStatus("Unlocked");
-      } else {
-        setStatus("Error");
+    const view = document.createElement("button");
+    view.className = "secondary";
+    view.textContent = "View";
+    view.addEventListener("click", () => {
+      if (normalized.tx && normalized.tx.startsWith("0x")) {
+        browser.tabs.create({ url: getExplorerUrl(normalized.tx) });
       }
     });
 
-    actions.appendChild(relink);
+    actions.appendChild(view);
     item.appendChild(host);
     item.appendChild(desc);
     item.appendChild(title);
-    item.appendChild(url);
     item.appendChild(actions);
     historyList.appendChild(item);
   }
