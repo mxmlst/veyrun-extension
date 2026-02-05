@@ -37,7 +37,8 @@ type Message =
   | { type: "confirmPendingPayment"; from: "popup"; tabId: number }
   | { type: "getReceipts"; from: "popup" }
   | { type: "reunlockWithReceipt"; from: "popup"; receipt: ReceiptRecord }
-  | { type: "openTopup"; from: "confirm" };
+  | { type: "openTopup"; from: "confirm" }
+  | { type: "confirmCancelled"; from: "confirm"; tabId: number };
 
 const actionApi = (browser as any).action ?? (browser as any).browserAction;
 
@@ -161,6 +162,7 @@ const pendingByTab = new Map<
     description?: string;
   }
 >();
+const pendingConfirmByTab = new Map<number, number>();
 
 const cleanHeaderValue = (value: string) =>
   value.trim().replace(/^\"|\"$/g, "");
@@ -379,6 +381,25 @@ browser.tabs.onRemoved.addListener((tabId) => {
   pendingByTab.delete(tabId);
 });
 
+browser.windows.onRemoved.addListener((windowId) => {
+  for (const [pendingTabId, confirmWindowId] of pendingConfirmByTab.entries()) {
+    if (confirmWindowId === windowId) {
+      pendingConfirmByTab.delete(pendingTabId);
+      pendingByTab.delete(pendingTabId);
+      browser.tabs.sendMessage(pendingTabId, {
+        type: "paymentResult",
+        ok: false,
+        error: "Payment cancelled."
+      });
+      broadcastPaymentStatus({
+        ok: false,
+        error: "Payment cancelled.",
+        tabId: pendingTabId
+      });
+    }
+  }
+});
+
 browser.runtime.onMessage.addListener(
   (message: Message, sender, sendResponse) => {
     if (message.type === "ping") {
@@ -563,6 +584,11 @@ browser.runtime.onMessage.addListener(
             top,
           });
         })
+        .then((created) => {
+          if (created?.id && tabId) {
+            pendingConfirmByTab.set(tabId, created.id);
+          }
+        })
         .catch(() => browser.tabs.create({ url: confirmUrl }))
         .finally(() => {
           sendResponse({ ok: true, pending: true });
@@ -648,6 +674,25 @@ browser.runtime.onMessage.addListener(
         .create({ url: topupUrl, type: "popup", width: 360, height: 520 })
         .catch(() => browser.tabs.create({ url: topupUrl }))
         .finally(() => sendResponse({ ok: true }));
+      return true;
+    }
+
+    if (message.type === "confirmCancelled") {
+      if (message.tabId) {
+        pendingByTab.delete(message.tabId);
+        pendingConfirmByTab.delete(message.tabId);
+        browser.tabs.sendMessage(message.tabId, {
+          type: "paymentResult",
+          ok: false,
+          error: "Payment cancelled."
+        });
+        broadcastPaymentStatus({
+          ok: false,
+          error: "Payment cancelled.",
+          tabId: message.tabId
+        });
+      }
+      sendResponse({ ok: true });
       return true;
     }
 

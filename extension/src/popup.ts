@@ -99,6 +99,8 @@ const qrModal = document.getElementById("qr-modal") as HTMLElement;
 const closeQr = document.getElementById("close-qr") as HTMLButtonElement;
 const qrImage = document.getElementById("qr-image") as HTMLImageElement;
 const qrAddress = document.getElementById("qr-address") as HTMLElement;
+const copyQr = document.getElementById("copy-qr") as HTMLButtonElement;
+const resetWallet = document.getElementById("reset-wallet") as HTMLButtonElement;
 
 let pendingPayment: PendingPayment | null = null;
 let receipts: ReceiptRecord[] = [];
@@ -136,7 +138,7 @@ const showX402 = (event: PaymentEvent) => {
   eventAmount.textContent = amount;
   eventRecipient.textContent = truncate(recipient, 8);
   eventTime.textContent = new Date(event.timestamp).toLocaleTimeString();
-  setStatus("402");
+  setStatus("Payment Required");
 };
 
 const showNoX402 = () => {
@@ -203,9 +205,10 @@ const loadPending = async () => {
   pendingPayment = response?.ok ? (response.pending as PendingPayment | null) : null;
   if (pendingPayment) {
     pendingRow.classList.remove("hidden");
-    pendingValue.textContent = `${pendingPayment.amount} ${pendingPayment.asset}`;
+    pendingValue.textContent = "Processing";
     payButton.disabled = false;
-    payButton.textContent = "Confirm payment";
+    payButton.textContent = "Confirm";
+    setStatus("Processing");
   } else {
     pendingRow.classList.add("hidden");
     payButton.textContent = "Pay with Veyrun";
@@ -238,12 +241,12 @@ const renderHistory = () => {
     const normalized = normalizeReceipt(receipt);
     const title = document.createElement("div");
     title.textContent = `${normalized.amount} ${formatAsset(normalized.asset)}${
-      normalized.timestamp ? " - " + new Date(normalized.timestamp).toLocaleString() : ""
+      normalized.timestamp ? " " + new Date(normalized.timestamp).toLocaleString() : ""
     }`;
 
-    const url = document.createElement("div");
-    url.className = "mono";
-    url.textContent = receipt.url;
+    const url = document.createElement("button");
+    url.className = "ghost";
+    url.textContent = "View";
     url.addEventListener("click", () => {
       if (normalized.tx && normalized.tx.startsWith("0x")) {
         browser.tabs.create({ url: getExplorerUrl(normalized.tx) });
@@ -255,7 +258,7 @@ const renderHistory = () => {
 
     const relink = document.createElement("button");
     relink.className = "secondary";
-    relink.textContent = "Re-unlock";
+    relink.textContent = "Unlock";
     relink.addEventListener("click", async () => {
       const response = await browser.runtime.sendMessage({
         type: "reunlockWithReceipt",
@@ -265,7 +268,7 @@ const renderHistory = () => {
       if (response?.ok) {
         setStatus("Unlocked");
       } else {
-        setStatus(response?.error ?? "Unlock failed.");
+        setStatus("Error");
       }
     });
 
@@ -277,6 +280,7 @@ const renderHistory = () => {
     item.appendChild(actions);
     historyList.appendChild(item);
   }
+
 };
 
 const loadHistory = async () => {
@@ -325,17 +329,20 @@ const confirmPending = async () => {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return;
   payButton.disabled = true;
-  payButton.textContent = "Paying...";
+  payButton.textContent = "Processing";
+  setStatus("Processing");
   const response = await browser.runtime.sendMessage({
     type: "confirmPendingPayment",
     from: "popup",
     tabId: tab.id
   });
   if (response?.ok) {
-    payButton.textContent = "Paid";
+    payButton.textContent = "Unlocked";
+    setStatus("Unlocked");
   } else {
-    payButton.textContent = "Confirm payment";
+    payButton.textContent = "Confirm";
     payButton.disabled = false;
+    setStatus("Error");
   }
 };
 
@@ -347,13 +354,15 @@ const payWithVeyrun = async () => {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return;
   payButton.disabled = true;
-  payButton.textContent = "Paying...";
+  payButton.textContent = "Processing";
+  setStatus("Processing");
   const response = await browser.runtime.sendMessage({
     type: "payWithVeyrun",
     from: "popup",
     tabId: tab.id
   });
-  payButton.textContent = response?.ok ? "Paid" : "Pay with Veyrun";
+  payButton.textContent = response?.ok ? "Unlocked" : "Pay with Veyrun";
+  setStatus(response?.ok ? "Unlocked" : "Error");
   if (!response?.ok) {
     payButton.disabled = false;
   }
@@ -376,6 +385,11 @@ refreshBtn?.addEventListener("click", async () => {
 });
 
 topupBtn?.addEventListener("click", openQr);
+copyQr?.addEventListener("click", async () => {
+  if (qrAddress.textContent) {
+    await navigator.clipboard.writeText(qrAddress.textContent);
+  }
+});
 
 changeAccountBtn?.addEventListener("click", openModal);
 closeModal?.addEventListener("click", closeModalUI);
@@ -413,6 +427,18 @@ exportHistoryBtn?.addEventListener("click", async () => {
   }
 });
 
+resetWallet?.addEventListener("click", async () => {
+  const confirmed = window.confirm("Reset agent wallet? This cannot be undone.");
+  if (!confirmed) return;
+  const response = await browser.runtime.sendMessage({
+    type: "walletCreate",
+    from: "popup"
+  });
+  if (response?.ok) {
+    await loadWalletStatus();
+    closeModalUI();
+  }
+});
 payButton?.addEventListener("click", payWithVeyrun);
 
 const init = async () => {
@@ -423,13 +449,28 @@ const init = async () => {
   const params = new URLSearchParams(window.location.search);
   if (params.get("topup") === "1") {
     await openQr();
+    history.replaceState(null, "", "popup.html");
   }
 };
 
 init();
 
 browser.runtime.onMessage.addListener((message) => {
-  if (message?.type === "paymentStatus" && message.ok) {
-    loadHistory();
+  if (message?.type === "paymentStatus") {
+    if (message.ok) {
+      loadHistory();
+      setStatus("Unlocked");
+      payButton.textContent = "Unlocked";
+      payButton.disabled = true;
+      pendingPayment = null;
+      return;
+    }
+    if (message.error) {
+      setStatus("Error");
+      pendingPayment = null;
+      pendingRow.classList.add("hidden");
+      payButton.textContent = "Pay with Veyrun";
+      payButton.disabled = false;
+    }
   }
 });

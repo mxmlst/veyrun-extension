@@ -4,21 +4,24 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Veyrun</title>
-    <link rel="stylesheet" href="popup.css" />
+    <link rel="stylesheet" href="extension.css" />
   </head>
   <body>
     <main class="app">
       <div class="scroll">
         <header class="header">
           <div>
-            <p class="eyebrow">Veyrun</p>
+            <p class="eyebrow">OZENTTI</p>
+            <h1>VEYRUN</h1>
           </div>
-          <span class="pill" id="status-pill">Idle</span>
+          <div class="header-actions">
+            <span class="pill" id="status-pill">Idle</span>
+          </div>
         </header>
 
-        <section class="card sticky" id="wallet-card">
-          <div class="card-title">Agent Wallet</div>
-          <div class="row justify">
+        <section class="section sticky" id="wallet-card">
+          <div class="section-title">WALLET</div>
+          <div class="keyvalue">
             <span class="label">Address</span>
             <span class="value-group">
               <span class="value mono" id="wallet-address">Not set</span>
@@ -36,7 +39,7 @@
               </button>
             </span>
           </div>
-          <div class="row justify">
+          <div class="keyvalue">
             <span class="label">Balance</span>
             <span class="value-group">
               <span class="value" id="wallet-balance">-</span>
@@ -52,54 +55,38 @@
               </button>
             </span>
           </div>
-          <div class="row justify">
+          <div class="keyvalue">
             <span class="label">Network</span>
             <span class="value" id="wallet-chain">-</span>
           </div>
+          <div class="divider"></div>
           <div class="button-row">
-            <button class="icon-button secondary" id="topup" title="Top up">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              <span>Top up</span>
-            </button>
-            <button
-              class="icon-button secondary"
-              id="change-account"
-              title="Change account"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="8" r="4"></circle>
-                <path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"></path>
-              </svg>
-              <span>Account</span>
-            </button>
+            <button class="secondary" id="topup">Top up</button>
+            <button class="secondary" id="change-account">Account</button>
           </div>
         </section>
 
-        <section class="card" id="event-card">
-          <div class="card-title" id="event-title">
-            This site has x402 payment
-          </div>
-          <div class="row">
+        <section class="section" id="event-card">
+          <div class="section-title">DETECTION</div>
+          <p class="hint" id="event-title">This site supports x402.</p>
+          <div class="keyvalue">
             <span class="label">Endpoint</span>
             <span class="value mono" id="event-endpoint">-</span>
           </div>
-          <div class="row">
+          <div class="keyvalue">
             <span class="label">Amount</span>
             <span class="value" id="event-amount">-</span>
           </div>
-          <div class="row">
+          <div class="keyvalue">
             <span class="label">Recipient</span>
             <span class="value mono" id="event-recipient">-</span>
           </div>
-          <div class="row">
+          <div class="keyvalue">
             <span class="label">Time</span>
             <span class="value" id="event-time">-</span>
           </div>
-          <div class="row hidden" id="pending-row">
-            <span class="label">Pending</span>
+          <div class="keyvalue hidden" id="pending-row">
+            <span class="label">Status</span>
             <span class="value" id="pending-value">Awaiting confirmation</span>
           </div>
           <button class="primary" id="pay-button" disabled>
@@ -107,23 +94,17 @@
           </button>
         </section>
 
-        <section class="card hidden" id="no-x402">
-          <div class="card-title">This page is not x402-enabled</div>
-          <p class="value">No recent payment-required responses detected.</p>
+        <section class="section hidden" id="no-x402">
+          <div class="section-title">DETECTION</div>
+          <p class="hint">No payment required detected.</p>
         </section>
 
-        <section class="card" id="history-card">
-          <div class="card-title">Receipt</div>
+        <section class="section" id="history-card">
+          <div class="section-title">RECEIPTS</div>
           <div class="button-row">
-            <button class="icon-button secondary" id="export-history">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 3v12"></path>
-                <path d="m7 10 5 5 5-5"></path>
-                <path d="M5 21h14"></path>
-              </svg>
-              <span>Export JSON</span>
-            </button>
+            <button class="secondary" id="export-history">Export</button>
           </div>
+          <div class="divider"></div>
           <div id="history-list" class="history-list"></div>
         </section>
       </div>
@@ -132,19 +113,20 @@
     <div id="modal" class="modal hidden">
       <div class="modal-card">
         <div class="modal-header">
-          <h2>Change account</h2>
-          <button id="close-modal" class="icon icon-only" title="Close">
+          <h2>Agent Key</h2>
+          <button id="close-modal" class="icon-button icon-only" title="Close">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
           </button>
         </div>
-        <label class="modal-label">Current Agent Key</label>
+        <label class="modal-label">Current key</label>
         <input type="password" id="current-key" readonly />
-        <label class="modal-label">New Agent Key</label>
+        <label class="modal-label">New key</label>
         <input type="password" id="new-key" placeholder="0x..." />
         <button class="primary" id="save-key">Save</button>
+        <button class="danger" id="reset-wallet">Reset wallet</button>
       </div>
     </div>
 
@@ -152,7 +134,7 @@
       <div class="modal-card">
         <div class="modal-header">
           <h2>Top up</h2>
-          <button id="close-qr" class="icon icon-only" title="Close">
+          <button id="close-qr" class="icon-button icon-only" title="Close">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -162,6 +144,8 @@
         <div class="qr">
           <img id="qr-image" alt="QR" />
           <p class="mono" id="qr-address"></p>
+          <button class="secondary" id="copy-qr">Copy address</button>
+          <p class="note">Funds appear when confirmed.</p>
         </div>
       </div>
     </div>

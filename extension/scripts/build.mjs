@@ -52,9 +52,8 @@ const buildTarget = async (targetName) => {
   await cp(path.resolve(root, "public", "icon-48.png"), path.resolve(dist, "icon-48.png"));
   await cp(path.resolve(root, "public", "icon-128.png"), path.resolve(dist, "icon-128.png"));
   await cp(path.resolve(root, "src", "popup.html"), path.resolve(dist, "popup.html"));
-  await cp(path.resolve(root, "src", "popup.css"), path.resolve(dist, "popup.css"));
-  await cp(path.resolve(root, "src", "confirm.html"), path.resolve(dist, "confirm.html"));
-  await cp(path.resolve(root, "src", "confirm.css"), path.resolve(dist, "confirm.css"));
+await cp(path.resolve(root, "src", "extension.css"), path.resolve(dist, "extension.css"));
+await cp(path.resolve(root, "src", "confirm.html"), path.resolve(dist, "confirm.html"));
   await cp(path.resolve(root, "src", "debug.html"), path.resolve(dist, "debug.html"));
   await cp(path.resolve(root, "src", "debug.css"), path.resolve(dist, "debug.css"));
 };

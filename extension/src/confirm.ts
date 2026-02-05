@@ -3,6 +3,7 @@ import browser from "webextension-polyfill";
 const amountEl = document.getElementById("amount");
 const recipientShortEl = document.getElementById("recipient-short");
 const confirmBtn = document.getElementById("confirm");
+const cancelBtn = document.getElementById("cancel");
 const headlineEl = document.getElementById("headline");
 const descriptionEl = document.getElementById("description");
 
@@ -121,6 +122,15 @@ confirmBtn.addEventListener("click", async () => {
     confirmBtn.textContent = "Confirm";
     confirmBtn.disabled = false;
   }
+});
+
+cancelBtn?.addEventListener("click", () => {
+  browser.runtime.sendMessage({
+    type: "confirmCancelled",
+    from: "confirm",
+    tabId
+  });
+  window.close();
 });
 
 loadPending();
