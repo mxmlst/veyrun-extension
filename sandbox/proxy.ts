@@ -4,7 +4,7 @@ import { registerExactEvmScheme } from "@x402/evm/exact/server";
 
 const payTo = process.env.X402_PAY_TO ?? "0x09b84e3a3140ecbd4eed8cf184126ab256b5a2a0";
 const price = process.env.X402_PRICE ?? "$0.001";
-const network = process.env.X402_NETWORK ?? "eip155:84532";
+const network = (process.env.X402_NETWORK ?? "eip155:84532") as `${string}:${string}`;
 const facilitatorUrl =
   process.env.X402_FACILITATOR_URL ?? "https://x402.org/facilitator";
 

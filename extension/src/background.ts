@@ -36,7 +36,8 @@ type Message =
   | { type: "getPendingPayment"; from: "popup"; tabId: number }
   | { type: "confirmPendingPayment"; from: "popup"; tabId: number }
   | { type: "getReceipts"; from: "popup" }
-  | { type: "reunlockWithReceipt"; from: "popup"; receipt: ReceiptRecord };
+  | { type: "reunlockWithReceipt"; from: "popup"; receipt: ReceiptRecord }
+  | { type: "openTopup"; from: "confirm" };
 
 const actionApi = (browser as any).action ?? (browser as any).browserAction;
 
@@ -148,7 +149,7 @@ type ReceiptRecord = {
 };
 
 const TTL_MS = 5 * 60 * 1000;
-const PAY_COOLDOWN_MS = 30 * 1000;
+const PAY_COOLDOWN_MS = 3 * 1000;
 const eventsByTab = new Map<number, PaymentEvent>();
 const recentPayments = new Map<string, number>();
 const RECEIPT_KEY = "veyrun_receipts";
@@ -541,20 +542,33 @@ browser.runtime.onMessage.addListener(
         title: "Veyrun payment pending",
         message: "Open the Veyrun extension to confirm payment.",
       });
-        const confirmUrl = browser.runtime.getURL(`confirm.html?tabId=${tabId}`);
-        browser.windows
-          .create({
+      const confirmUrl = browser.runtime.getURL(`confirm.html?tabId=${tabId}`);
+      const popupWidth = 360;
+      const popupHeight = 500;
+      browser.windows
+        .getLastFocused()
+        .then((win) => {
+          const leftBase = win?.left ?? 0;
+          const topBase = win?.top ?? 0;
+          const widthBase = win?.width ?? 1200;
+          const heightBase = win?.height ?? 800;
+          const left = Math.max(0, leftBase + widthBase - popupWidth - 20);
+          const top = Math.max(0, topBase + heightBase - popupHeight - 40);
+          return browser.windows.create({
             url: confirmUrl,
             type: "popup",
-            width: 360,
-            height: 500,
-          })
-          .catch(() => browser.tabs.create({ url: confirmUrl }))
-          .finally(() => {
-            sendResponse({ ok: true, pending: true });
+            width: popupWidth,
+            height: popupHeight,
+            left,
+            top,
           });
-        return true;
-      }
+        })
+        .catch(() => browser.tabs.create({ url: confirmUrl }))
+        .finally(() => {
+          sendResponse({ ok: true, pending: true });
+        });
+      return true;
+    }
 
     if (message.type === "getPendingPayment") {
       const pending = pendingByTab.get(message.tabId) ?? null;
@@ -562,7 +576,7 @@ browser.runtime.onMessage.addListener(
       return true;
     }
 
-  if (message.type === "confirmPendingPayment") {
+    if (message.type === "confirmPendingPayment") {
       const pending = pendingByTab.get(message.tabId);
       if (!pending) {
         sendResponse({ ok: false, error: "No pending payment." });
@@ -625,6 +639,15 @@ browser.runtime.onMessage.addListener(
           sendResponse({ ok: true, receipts: normalized });
         })
         .catch((error: Error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+
+    if (message.type === "openTopup") {
+      const topupUrl = browser.runtime.getURL("popup.html?topup=1");
+      browser.windows
+        .create({ url: topupUrl, type: "popup", width: 360, height: 520 })
+        .catch(() => browser.tabs.create({ url: topupUrl }))
+        .finally(() => sendResponse({ ok: true }));
       return true;
     }
 

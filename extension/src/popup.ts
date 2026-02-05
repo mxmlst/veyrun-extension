@@ -420,6 +420,10 @@ const init = async () => {
   await loadWalletStatus();
   await loadPending();
   await loadHistory();
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("topup") === "1") {
+    await openQr();
+  }
 };
 
 init();
