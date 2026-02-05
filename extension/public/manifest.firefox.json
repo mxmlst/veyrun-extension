@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
   "name": "Veyrun",
-  "version": "0.1.1",
-  "description": "Veyrun x402 unlocker (scaffold)",
+  "version": "0.1.2",
+  "description": "Veyrun x402",
   "browser_specific_settings": {
     "gecko": {
       "id": "veyrun@local",
